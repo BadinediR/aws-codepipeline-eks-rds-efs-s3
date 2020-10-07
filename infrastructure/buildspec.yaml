@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - curl --silent -o yq --location $YQ_URL
+      - curl --silent -o jq --location $JQ_URL
+      - chmod +x ./yq ./jq
+      - export PATH=$PWD/:$PATH
+  build:
+    commands:
+      - mkdir -p build/
+      - 'if "${USE_EXISTING_VPC}"; then yq r config.yaml -j "Pipeline.ExistingVPC" >> build/StackOutput.json; fi;'
+      - 'if ! "${USE_EXISTING_VPC}"; then yq r config.yaml -j "EKS.VPCParameters" | jq ". | { Parameters: . }" >> build/Infra-Setup-CFN-pipeline-values.json; fi;'
+artifacts:
+  files:
+    - build/*
+  discard-paths: yes

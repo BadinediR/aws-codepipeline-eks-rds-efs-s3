@@ -1,0 +1,100 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create S3 Backup Bucket
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    -
+      Label:
+        default: Ownership
+      Parameters:
+        - Owner
+        - Project
+    -
+      Label:
+        default: Deployment
+      Parameters:
+        - BucketName
+        - PreviousLifeCycle
+    ParameterLabels:
+      # Ownership
+      Owner:
+        default: Contact Owner
+      Project:
+        default: KubeFlow
+      # Deployment
+      BucketName:
+        default: Bucket Name
+      PreviousLifeCycle:
+        default: Previous LifeCycle (Days)
+Parameters:
+  # Ownership
+  Owner:
+    Description: Team or user who owns the mount for tracking purpose
+    Type: String
+    Default: FirstName LastName
+  Project:
+    Default: Project name for tracking purpose
+    Type: String
+    Default: S3 Bucket for Kubeflow
+  # Deployment
+  BucketName:
+    Default: S3 Bucket Name
+    Type: String
+    Default: kubeflow-sample-hsdkfhksdfh
+  PreviousLifeCycle:
+    Type: Number
+    Default: 30
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+         - Id: !Join [ "", [ "Delete Previous > ", !Ref PreviousLifeCycle, " Days" ] ]
+           NoncurrentVersionExpirationInDays: !Ref PreviousLifeCycle
+           Status: Enabled
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Project
+          Value: !Ref Project
+#  BucketPolicy:
+#    Type: AWS::S3::BucketPolicy
+#    Properties:
+#      Bucket: !Ref Bucket
+#      PolicyDocument:
+#        Version: '2008-10-17'
+#        Statement:
+#        -
+#          Sid: "Deny Unencrypted Put Object"
+#          Effect: Deny
+#          Principal: "*"
+#          Action:
+#            - "s3:PutObject"
+#          Resource: !Join [ "", [ "arn:aws:s3:::", !Ref Bucket, "/*" ] ]
+#          Condition:
+#            StringNotEquals:
+#              s3:x-amz-server-side-encryption:
+#                - "AES256"
+#                - "aws:kms"
+#        -
+#          Sid: "Deny Unencrypted Object Uploads"
+#          Effect: Deny
+#          Principal: "*"
+#          Action:
+#            - "s3:PutObject"
+#          Resource: !Join [ "", [ "arn:aws:s3:::", !Ref Bucket, "/*" ] ]
+#          Condition:
+#            StringNotEquals:
+#              s3:x-amz-server-side-encryption: "true"
+Outputs:
+  BucketName:
+    Description: S3 Bucket Name
+    Value: !Ref BucketName
+  PreviousLifeCycle:
+    Description: Previous Life Cycle
+    Value: !Ref PreviousLifeCycle

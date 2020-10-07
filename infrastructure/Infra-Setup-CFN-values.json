@@ -1,0 +1,10 @@
+[
+    {
+        "ParameterKey": "AvailabilityZones",
+        "ParameterValue": "us-east-1a,us-east-1b"
+    },
+    {
+        "ParameterKey": "NumberOfAZs",
+        "ParameterValue": "2"
+    }
+]

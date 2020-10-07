@@ -1,0 +1,205 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create Elastic File System v20161029-1200
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Ownership
+      Parameters:
+      - Owner
+      - Project
+    - Label:
+        default: Network Configuration
+      Parameters:
+      - VPC
+      - Subnet
+      - Subnet Number
+    - Label:
+        default: EFS Configuration
+      Parameters:
+      - PerformanceMode
+    ParameterLabels:
+      Owner:
+        default: Team or Individual Owner
+      VPC:
+        default: VPC ID
+      PerformanceMode:
+        default: EFS Performance Mode
+Parameters:
+  # Ownership
+  Owner:
+    Description: Team or user who owns the mount for tracking purpose
+    Type: String
+    Default: FirstName LastName
+  Project:
+    Default: Project name for tracking purpose
+    Type: String
+    Default: EFS Kubeflow
+  # Network
+  VPC:
+    Description: The ID of the VPC to launch the EFS into
+    Type: AWS::EC2::VPC::Id
+  SubnetNumber:
+    Description: Number of subnets where we should create the mount points in. 
+    Type: Number
+    Default: '1'
+    AllowedValues:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+  Subnets:
+    Description: The ID of the Subnets to create Target Mounts into, Should match the number in above parameter.
+    Type: List<AWS::EC2::Subnet::Id>
+  # EFS
+  PerformanceMode:
+    Type: String
+    Default: generalPurpose
+    AllowedValues:
+    - generalPurpose
+    - maxIO
+Conditions: 
+  2sub: !Or
+    - !Equals
+      - !Ref SubnetNumber
+      - '2'
+    - !Condition '3sub'
+    - !Condition '4sub'
+    - !Condition '5sub'
+  3sub: !Or
+    - !Equals
+      - !Ref SubnetNumber
+      - '3'
+    - !Condition '4sub'
+    - !Condition '5sub'
+  4sub: !Or
+    - !Equals
+      - !Ref SubnetNumber
+      - '4'
+    - !Condition '5sub'     
+  5sub:
+    !Equals
+      - !Ref SubnetNumber
+      - '5' 
+Resources:
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+      - Key: Name
+        Value: !Ref AWS::StackName
+      - Key: Owner
+        Value: !Ref Owner
+      - Key: Project
+        Value: !Ref Project
+      PerformanceMode: !Ref PerformanceMode
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Instance to EFS Mount Access
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Ref AWS::StackName
+      - Key: Owner
+        Value: !Ref Owner
+      - Key: Project
+        Value: !Ref Project
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: EfsSecurityGroup
+    Properties:
+      GroupId: !Ref EfsSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref EfsSecurityGroup
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    DependsOn:
+    - FileSystem
+    - EfsSecurityGroup
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [0, !Ref Subnets]
+      SecurityGroups:
+      - !Ref EfsSecurityGroup
+  MountTarget2:
+    Condition: 2sub
+    Type: AWS::EFS::MountTarget
+    DependsOn:
+    - FileSystem
+    - EfsSecurityGroup
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [1, !Ref Subnets]
+      SecurityGroups:
+      - !Ref EfsSecurityGroup
+  MountTarget3:
+    Condition: 3sub
+    Type: AWS::EFS::MountTarget
+    DependsOn:
+    - FileSystem
+    - EfsSecurityGroup
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [2, !Ref Subnets]
+      SecurityGroups:
+      - !Ref EfsSecurityGroup
+  MountTarget4:
+    Condition: 4sub
+    Type: AWS::EFS::MountTarget
+    DependsOn:
+    - FileSystem
+    - EfsSecurityGroup
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [3, !Ref Subnets]
+      SecurityGroups:
+      - !Ref EfsSecurityGroup
+  MountTarget5:
+    Condition: 5sub
+    Type: AWS::EFS::MountTarget
+    DependsOn:
+    - FileSystem
+    - EfsSecurityGroup
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [4, !Ref Subnets]
+      SecurityGroups:
+      - !Ref EfsSecurityGroup
+Outputs:
+  Owner:
+    Description: Team or Individual that Owns this Formation.
+    Value: !Ref Owner
+  Project:
+    Description: The project name
+    Value: !Ref Project
+  VPC:
+    Description: Created in VPC
+    Value: !Ref VPC
+  FileSystem:
+    Description: FileSystem
+    Value: !Ref FileSystem
+  PerformanceMode:
+    Description: PerformanceMode
+    Value: !Ref PerformanceMode
+  MountTarget1:
+    Description: MountTarget 1
+    Value: !Ref MountTarget1
+  MountTarget2:
+    Condition: 2sub
+    Description: MountTarget 2
+    Value: !Ref MountTarget2
+  MountTarget3:
+    Condition: 3sub
+    Description: MountTarget 3
+    Value: !Ref MountTarget3
+  MountTarget4:
+    Condition: 4sub
+    Description: MountTarget 4
+    Value: !Ref MountTarget4
+  MountTarget5:
+    Condition: 5sub
+    Description: MountTarget 5
+    Value: !Ref MountTarget5

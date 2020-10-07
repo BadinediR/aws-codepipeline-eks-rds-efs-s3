@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - curl -sS -o aws-iam-authenticator $AWS_IAM_AUTHENTICATOR_URL
+      - curl -sS -o kubectl $KUBECTL_URL
+      - curl --silent -o yq --location $YQ_URL
+      - curl --silent -o jq --location $JQ_URL
+      - curl --silent --location "$EKSCTL_URL" | tar xz -C .
+      - chmod +x ./kubectl ./aws-iam-authenticator ./eksctl ./yq ./jq
+      - export PATH=$PWD/:$PATH
+      - apt update && apt install bc -y
+  build:
+    commands:
+      - mkdir build
+      - ./eks/eks-config.sh -f eks/sample-eksctl-cluster.yaml -o build/sample-eksctl-cluster.yaml -b "$CODEBUILD_BUILD_NUMBER" -c "$CLUSTER_NAME" -v $EKS_VERSION -p "$SOURCE_CONFIGS"
+      - ./eks/eks-manage.sh -f build/sample-eksctl-cluster.yaml -r "$AWS_REGION" -v $EKS_VERSION -c "$CLUSTER_NAME"
+artifacts:
+  files:
+    - build/*
+  discard-paths: yes

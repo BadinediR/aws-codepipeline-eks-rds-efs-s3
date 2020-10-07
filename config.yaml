@@ -1,0 +1,75 @@
+Pipeline:
+  StackName: kubeflow-pipeline
+  BranchName: master
+  Region: us-east-1
+  RepositoryName: kube-flow-on-eks
+EKS:
+  EKSVersion: "1.15"
+  # Role Which can be assumed to debug EKS cluster. 
+  DebugRoleArn: <Role ARN>
+  UseExistingVPC: false
+  VPCParameters:
+      AvailabilityZones: us-east-1a,us-east-1b
+      NumberOfAZs: "2"
+  # ExistingVPC: 
+  #   PrivateSubnet1AZ: us-east-2a
+  #   PrivateSubnet1ID: subnet-025c3c3e2c2345054
+  #   PrivateSubnet2AZ: us-east-2b
+  #   PrivateSubnet2ID: subnet-0a25d5a1139d6686b
+  #   REGION: us-east-2
+  #   VPCID: vpc-0ece9d89de5bb7afd
+Packages:
+  jq: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+  yq: https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
+  kfctl: https://github.com/kubeflow/kfctl/releases/download/v1.0.2/kfctl_v1.0.2-0-ga476281_linux.tar.gz
+  kubectl: https://amazon-eks.s3-us-west-2.amazonaws.com/1.14.6/2019-08-22/bin/linux/amd64/kubectl
+  awsIamAuthenticator: https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-07-26/bin/linux/amd64/aws-iam-authenticator
+  eksctl: https://github.com/weaveworks/eksctl/releases/download/0.20.0/eksctl_Linux_amd64.tar.gz
+Kubeflow:
+  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws.v1.0.2.yaml
+  UseCognito: false
+  # options true, false
+  UseEFS: true 
+  # options true, false
+  UseEFSControlPlane: true 
+  # ExistingEFS: fs-23d53426 #Set the value of the existing id of efs to use. 
+  # ExistingEFSControlPlane: fs-20d53425 #Set the value of the existing id of efs to use.
+  UseRDS: true
+  # S3 not currently available in Kubeflow
+  UseS3: false
+  ALBPolicyDocument: https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/iam-policy.json
+  HostedZoneId:  Z0171974248O477WDK1EM
+  Route53DomainName: kubeflow-on-eks-test-cluster.glasser.io
+Cognito:
+  # If UseCognito is set to true this will overide the kubeflow config file
+  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws_cognito.v1.0.2.yaml
+  certARN: "<Cert ARN>"
+  cognitoAppClientId: <> 
+  cognitoUserPoolArn: "<>"
+  cognitoUserPoolDomain: <> 
+RDS:
+  AllocatedStorageAndIops: '100GB 1000IOPS'
+  AllowMajorVersionUpgrade: 'false'
+  AutoMinorVersionUpgrade: 'true'
+  BackupRetentionPeriod: '35'
+  CopyTagsToSnapshot: 'true'
+  DBInstanceClass: 'db.t3.medium'
+  DBName: 'RDSMySQL'
+  EngineVersion: '5.7.23'
+  MasterUsername: 'Admin'
+  MonitoringInterval: '30'
+  MultiAZ: 'false'
+  NumberOfAvailabilityZones:  '2'
+  PortNumber: '3306'
+  PreferredBackupWindow: '00:00-02:00'
+  PreferredMaintenanceWindowDay: 'Sun'
+  PreferredMaintenanceWindowEndTime: '06:00'
+  PreferredMaintenanceWindowStartTime: '04:00'
+  PubliclyAccessible: 'false'
+  StorageEncrypted: 'false'
+  StorageType: 'io1'
+  # DBSnapshotIdentifier: #set the arn of an existing snapshot to restore the database from.
+EFS:
+  Owner: FirstName LastName
+  Project: EFS Kubeflow
+  PerformanceMode: generalPurpose

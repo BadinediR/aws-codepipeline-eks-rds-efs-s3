@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - curl --silent -o yq --location $YQ_URL
+      - curl --silent -o jq --location $JQ_URL
+      - chmod +x ./yq ./jq
+      - export PATH=$PWD/:$PATH
+  build:
+    commands:
+      - mkdir -p build/
+      - ./EFS/efs-config.sh -c $SOURCE_CONFIGS -o build/EFS-CFN-pipeline-values.json
+artifacts:
+  files:
+    - build/*
+  discard-paths: yes

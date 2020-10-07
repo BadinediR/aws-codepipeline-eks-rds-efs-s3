@@ -1,0 +1,777 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+    This is a template to build out the pipeline that will deploy in three steps. The first is the deployment of a VPC
+    the second is the deployment and upgrade of EKS. The third is the deployment of Kubeflow on top of EKS and any addition
+    Kubernetes configuration options.
+
+Parameters:
+  StackName:
+    Default: kubeflow-on-eks
+    Description: A name for the test stack
+    Type: String
+  BranchName:
+    Description: CodeCommit branch name
+    Type: String
+    Default: master
+  RepositoryName:
+    Description: CodeComit repository name
+    Type: String
+    Default: myrepo
+  RDSStackConfig:
+    Default: RDS-CFN-pipeline-values.json
+    Description: The configuration file name for the test stack
+    Type: String
+  EKSVersion:
+    Description: EKS Version
+    Type: String
+  UseRDS:
+    Description: Should RDS be used for Kubeflow
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String
+  UseEFS:
+    Description: Should EFS be used for Kubeflow
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String
+  UseEFSControlPlane:
+    Description: Should EFS be used for Kubeflow Control Plane
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String
+  ExistingEFS:
+    Description: Should Kubeflow us an existing EFS Instance
+    Type: String
+  ExistingEFSControlPlane:
+    Description: Should Kubeflow us an existing EFS Instance for Control Plane
+    Type: String
+  UseExistingVPC:
+    Description: Will this use an existing VPC?
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String
+  yqURL:
+    Description: YQ Download URL
+    Type: String
+  jqURL:
+    Description: JQ Download URL
+    Type: String
+  kfctlURL:
+    Description: KFCTL Download URL
+    Type: String
+  kubectlURL:
+    Description: KUBECTL Download URL
+    Type: String
+  awsiamauthenticatorURL:
+    Description: YQ Download URL
+    Type: String
+  eksctlURL:
+    Description: EKSCTL Download URL
+    Type: String
+    
+Conditions:
+  UseExistingVPCCondition: !Equals
+    - !Ref 'UseExistingVPC'
+    - 'true'
+  CreateVPCCondition: !Not
+    - !Equals
+      - !Ref 'UseExistingVPC'
+      - 'true'
+  UseRDSCondition: !Equals
+    - !Ref 'UseRDS'
+    - 'true'
+  UseEFSCondition: !And
+    - !Equals
+      - !Ref 'UseEFS'
+      - 'true'
+    - !Equals
+      - !Ref 'ExistingEFS'
+      - ''
+  UseEFSControlPlane: !And
+    - !Equals
+      - !Ref 'UseEFSControlPlane'
+      - 'true'
+    - !Equals
+      - !Ref 'ExistingEFSControlPlane'
+      - ''
+  UseAnyEFSCondition: !Or
+    - !Condition 'UseEFSControlPlane'
+    - !Condition 'UseEFSCondition'
+  KubeflowAddOnsCondition: !Or
+    - !Condition 'UseEFSControlPlane'
+    - !Condition 'UseEFSCondition'
+    - !Condition 'UseRDSCondition'
+Resources:
+  CodePipelineArtifactStoreBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+  CodePipelineArtifactStoreBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref CodePipelineArtifactStoreBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': 'aws:kms'
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+  AmazonCloudWatchEventRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'codepipeline:StartPipelineExecution'
+                Resource: !Join 
+                  - ''
+                  - - 'arn:aws:codepipeline:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':'
+                    - !Ref AppPipeline
+  AmazonCloudWatchEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - CodeCommit Repository State Change
+        resources:
+          - !Join 
+            - ''
+            - - 'arn:aws:codecommit:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref RepositoryName
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref BranchName
+      Targets:
+        - Arn: !Join 
+            - ''
+            - - 'arn:aws:codepipeline:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref AppPipeline
+          RoleArn: !GetAtt 
+            - AmazonCloudWatchEventRole
+            - Arn
+          Id: codepipeline-AppPipeline
+  AppPipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      Name: !Sub "${StackName}-Pipeline"
+      RoleArn: !GetAtt 
+        - CodePipelineServiceRole
+        - Arn
+      Stages:
+        - Name: PullSourceConfigs
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceConfigs
+              Configuration:
+                BranchName: !Ref BranchName
+                RepositoryName: !Ref RepositoryName
+                PollForSourceChanges: false
+              RunOrder: '1'
+        - Name: Infrastructure
+          Actions:
+            - Name: CreateConfigs
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildConfigs
+              InputArtifacts:
+                - Name: SourceConfigs
+              Configuration:
+                PrimarySource: SourceConfigs
+                ProjectName: !Ref CreateBuildConfigs
+              RunOrder: '1'
+            - !If 
+              - CreateVPCCondition
+              - Name: CreateInfraStack
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: CloudFormation
+                  Version: '1'
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - Name: BuildConfigs
+                OutputArtifacts:
+                  - Name: StackOutput
+                Configuration:
+                  OutputFileName: StackOutput.json
+                  ActionMode: REPLACE_ON_FAILURE
+                  RoleArn: !GetAtt [CFNRole, Arn]
+                  StackName: !Sub "${StackName}-Infra"
+                  TemplateConfiguration: "BuildConfigs::Infra-Setup-CFN-pipeline-values.json"
+                  TemplatePath: "SourceConfigs::infrastructure/Infra-Setup-CFN.yaml"
+                RunOrder: '2'
+              - !Ref 'AWS::NoValue'
+        - Name: EKS
+          Actions:
+          - Name: DeployEKS
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Version: 1
+              Provider: CodeBuild
+            OutputArtifacts:
+              - Name: Kubectl
+            InputArtifacts:
+              - Name: SourceConfigs
+              - Name: StackOutput
+            Configuration:
+              PrimarySource: SourceConfigs
+              ProjectName: !Ref InstallEKSProject
+            RunOrder: '1'
+        - !If 
+          - KubeflowAddOnsCondition
+          - Name: KubeFlowAddOns
+            Actions:
+            - !If
+              - UseAnyEFSCondition
+              - Name: CreateEFSConfigs
+                ActionTypeId:
+                  Category: Build
+                  Owner: AWS
+                  Version: 1
+                  Provider: CodeBuild
+                OutputArtifacts:
+                  - Name: EFSBuildConfigs
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - !If
+                    - CreateVPCCondition
+                    - Name: StackOutput
+                    - Name: BuildConfigs
+                Configuration:
+                  PrimarySource: SourceConfigs
+                  ProjectName: !Ref CreateEFSBuildConfigs
+                RunOrder: '1'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - UseRDSCondition
+              - Name: CreateRDSConfigs
+                ActionTypeId:
+                  Category: Build
+                  Owner: AWS
+                  Version: 1
+                  Provider: CodeBuild
+                OutputArtifacts:
+                  - Name: RDSBuildConfigs
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - !If
+                    - CreateVPCCondition
+                    - Name: StackOutput
+                    - Name: BuildConfigs
+                Configuration:
+                  PrimarySource: SourceConfigs
+                  ProjectName: !Ref CreateRDSBuildConfigs
+                RunOrder: '1'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - UseRDSCondition
+              - Name: CreateRDStack
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: CloudFormation
+                  Version: '1'
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - Name: RDSBuildConfigs
+                OutputArtifacts:
+                  - Name: RDStackOutput
+                Configuration:
+                  OutputFileName: StackOutput.json
+                  ActionMode: REPLACE_ON_FAILURE
+                  RoleArn: !GetAtt [CFNRDSRole, Arn]
+                  StackName: !Sub "${StackName}-RDS"
+                  Capabilities: CAPABILITY_IAM
+                  TemplateConfiguration: "RDSBuildConfigs::RDS-CFN-pipeline-values.json"
+                  TemplatePath: "SourceConfigs::RDS/sample-rds.yaml"
+                RunOrder: '2'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - UseEFSCondition
+              - Name: Create-EFS-Stack
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: CloudFormation
+                  Version: '1'
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - Name: EFSBuildConfigs
+                OutputArtifacts:
+                  - Name: EFSStackOutput
+                Configuration:
+                  OutputFileName: StackOutput.json
+                  ActionMode: REPLACE_ON_FAILURE
+                  RoleArn: !GetAtt [CFNRDSRole, Arn]
+                  StackName: !Sub "${StackName}-EFS"
+                  Capabilities: CAPABILITY_IAM
+                  TemplateConfiguration: "EFSBuildConfigs::EFS-CFN-pipeline-values.json"
+                  TemplatePath: "SourceConfigs::EFS/efs-cfn.yaml"
+                RunOrder: '2'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - UseEFSControlPlane
+              - Name: Create-EFS-Control-Plane-Stack
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: CloudFormation
+                  Version: '1'
+                InputArtifacts:
+                  - Name: SourceConfigs
+                  - Name: EFSBuildConfigs
+                OutputArtifacts:
+                  - Name: EFSControlPlaneStackOutput
+                Configuration:
+                  OutputFileName: StackOutput.json
+                  ActionMode: REPLACE_ON_FAILURE
+                  RoleArn: !GetAtt [CFNRDSRole, Arn]
+                  StackName: !Sub "${StackName}-EFS-Control-Plane"
+                  Capabilities: CAPABILITY_IAM
+                  TemplateConfiguration: "EFSBuildConfigs::EFS-CFN-pipeline-values.json"
+                  TemplatePath: "SourceConfigs::EFS/efs-cfn.yaml"
+                RunOrder: '2'
+              - !Ref 'AWS::NoValue'
+          - !Ref 'AWS::NoValue'
+        - Name: KubeFlow
+          Actions:
+          - Name: InstallKF
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Version: 1
+              Provider: CodeBuild
+            InputArtifacts:
+              - Name: SourceConfigs
+              - !If
+                - UseRDSCondition
+                - Name: RDStackOutput
+                - !Ref "AWS::NoValue"
+              - !If
+                - UseEFSCondition
+                - Name: EFSStackOutput
+                - !Ref "AWS::NoValue"
+              - !If
+                - UseEFSControlPlane
+                - Name: EFSControlPlaneStackOutput
+                - !Ref "AWS::NoValue"
+              - Name:
+                  !If
+                    - CreateVPCCondition
+                    - 'StackOutput'
+                    - 'BuildConfigs'
+            Configuration:
+              PrimarySource: SourceConfigs
+              ProjectName: !Ref InstallKubeflowProject
+            RunOrder: '1'
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineArtifactStoreBucket
+  
+  InstallEKSProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: CLUSTER_NAME
+            Value: !Sub "${StackName}"
+          - Name: EKS_VERSION
+            Value: !Ref EKSVersion
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: KFCTL_URL
+            Value: !Ref kfctlURL
+          - Name: KUBECTL_URL
+            Value: !Ref kubectlURL
+          - Name: AWS_IAM_AUTHENTICATOR_URL
+            Value: !Ref awsiamauthenticatorURL
+          - Name: EKSCTL_URL
+            Value: !Ref eksctlURL
+          - Name: SOURCE_CONFIGS
+            Value:
+              !If
+                - CreateVPCCondition
+                - 'StackOutput'
+                - 'BuildConfigs'
+      Name: !Sub ${AWS::StackName}-Install-EKS
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 'eks/buildspec.yaml'
+
+  CreateRDSBuildConfigs:
+    Condition: UseRDSCondition
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: SOURCE_CONFIGS
+            Value:
+              !If
+                - CreateVPCCondition
+                - 'StackOutput'
+                - 'BuildConfigs'
+      Name: !Sub ${AWS::StackName}-Create-RDS-Configs
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 'RDS/buildspec.yaml'
+
+  CreateEFSBuildConfigs:
+    Condition: UseAnyEFSCondition
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: USE_EFS
+            Value: !Ref UseEFS
+          - Name: USE_EFS_CONTROL_PLANE
+            Value: !Ref UseEFSControlPlane
+          - Name: SOURCE_CONFIGS
+            Value:
+              !If
+                - CreateVPCCondition
+                - 'StackOutput'
+                - 'BuildConfigs'
+      Name: !Sub ${AWS::StackName}-Create-EFS-Configs
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 'EFS/buildspec.yaml'
+
+  CreateBuildConfigs:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: USE_EXISTING_VPC
+            Value: !Ref UseExistingVPC
+          - Name: USE_RDS
+            Value: !Ref UseRDS
+      Name: !Sub ${AWS::StackName}-Create-VPC-Configs
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 'infrastructure/buildspec.yaml'
+
+  InstallKubeflowProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - !If
+            - UseRDSCondition
+            - Name: DB_PASSWORD
+              Type: SECRETS_MANAGER
+              Value: !Sub "${StackName}-RDS/RDSCredentials"
+            - !Ref "AWS::NoValue"
+          - Name: CLUSTER_NAME
+            Value: !Sub "${StackName}"
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: KFCTL_URL
+            Value: !Ref kfctlURL
+          - Name: KUBECTL_URL
+            Value: !Ref kubectlURL
+          - Name: AWS_IAM_AUTHENTICATOR_URL
+            Value: !Ref awsiamauthenticatorURL
+          - Name: EKSCTL_URL
+            Value: !Ref eksctlURL
+          - Name: EXISTING_EFS_CONTROL_PLANE
+            Value: !Ref ExistingEFSControlPlane
+          - Name: EXISTING_EFS
+            Value: !Ref ExistingEFS
+          - Name: SOURCE_CONFIGS
+            Value:
+              !If
+                - CreateVPCCondition
+                - 'StackOutput'
+                - 'BuildConfigs'
+      Name: !Sub ${AWS::StackName}-Install-Kubeflow
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 'kubeflow/buildspec.yaml'
+
+  DeleteKubeFlowProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: CLUSTER_NAME
+            Value: !Sub "${StackName}"
+          - Name: INFRA_STACK_NAME
+            Value: !Sub "${StackName}-Infra"
+          - Name: STACK_NAME
+            Value: !Ref StackName
+          - Name: YQ_URL
+            Value: !Ref yqURL
+          - Name: JQ_URL
+            Value: !Ref jqURL
+          - Name: KFCTL_URL
+            Value: !Ref kfctlURL
+          - Name: KUBECTL_URL
+            Value: !Ref kubectlURL
+          - Name: AWS_IAM_AUTHENTICATOR_URL
+            Value: !Ref awsiamauthenticatorURL
+          - Name: EKSCTL_URL
+            Value: !Ref eksctlURL
+          - Name: USE_EXISTING_VPC
+            Value: !Ref UseExistingVPC
+          - Name: USE_RDS
+            Value: !Ref UseRDS
+          - Name: USE_EFS
+            Value: !Ref UseEFS
+          - Name: USE_EFS_CONTROL_PLANE
+            Value: !Ref UseEFSControlPlane
+          - !If
+            - UseRDSCondition
+            - Name: RDS_STACK_NAME
+              Value: !Sub "${StackName}-RDS"
+            - !Ref "AWS::NoValue"
+          - !If
+            - UseEFSCondition
+            - Name: EFS_STACK_NAME
+              Value: !Sub "${StackName}-EFS"
+            - !Ref "AWS::NoValue"
+          - !If
+            - UseEFSControlPlane
+            - Name: EFS_CONTROL_PLANE_STACK_NAME
+              Value: !Sub "${StackName}-EFS-Control-Plane"
+            - !Ref "AWS::NoValue"
+      Name: !Sub "${StackName}-DELETE"
+      ServiceRole: !Ref CodeBuildRole
+      SourceVersion: !Sub "refs/heads/${BranchName}"
+      Source:
+        Type: CODECOMMIT
+        Location:
+          Fn::Join:
+            - ""
+            - - "https://git-codecommit."
+              - Ref: AWS::Region
+              - ".amazonaws.com/v1/repos/"
+              - Ref: RepositoryName
+        BuildSpec: 'pipeline/delete-buildspec.yaml'
+
+  CFNRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [cloudformation.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CloudFormationRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - 'ec2:*'
+                Effect: Allow
+                Resource: '*'
+  CFNRDSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [cloudformation.amazonaws.com]
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+                
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: AWS-CodePipeline-Service-3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'codecommit:CancelUploadArchive'
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:GetUploadArchiveStatus'
+                  - 'codecommit:UploadArchive'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                  - 'lambda:ListFunctions'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:*'
+                  - 'elasticloadbalancing:*'
+                  - 'autoscaling:*'
+                  - 'cloudwatch:*'
+                  - 's3:*'
+                  - 'sns:*'
+                  - 'cloudformation:*'
+                  - 'rds:*'
+                  - 'sqs:*'
+                Resource: '*'

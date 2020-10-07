@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - curl -sS -o aws-iam-authenticator $AWS_IAM_AUTHENTICATOR_URL
+      - curl -sS -o kubectl $KUBECTL_URL
+      - curl --silent -o yq --location $YQ_URL
+      - curl --silent -o jq --location $JQ_URL
+      - curl --silent --location $EKSCTL_URL | tar xz -C .
+      - curl --silent --location $KFCTL_URL | tar xz -C .
+      - chmod +x ./kubectl ./aws-iam-authenticator ./eksctl ./yq ./jq ./kfctl
+      - apt update && apt install git -y
+      - export PATH=$PWD/:$PATH
+  build:
+    commands:
+      - mkdir build
+      - aws eks --region $AWS_REGION update-kubeconfig --name "$CLUSTER_NAME"
+      - ./kubeflow/kubeflow-install.sh -c "$CLUSTER_NAME" -r $AWS_REGION

@@ -1,0 +1,30 @@
+[
+    {
+        "ParameterKey": "PipelineName",
+        "ParameterValue": "kubeflow-pipeline"
+    },
+    {
+        "ParameterKey": "BranchName",
+        "ParameterValue": "existing-vpc"
+    },
+    {
+        "ParameterKey": "RepositoryName",
+        "ParameterValue": "kube-flow-on-eks"
+    },
+    {
+        "ParameterKey": "ClusterName",
+        "ParameterValue": "kube-flow-on-eks"
+    },
+    {
+        "ParameterKey": "EKSVersion",
+        "ParameterValue": "1.16"
+    },
+    {
+        "ParameterKey": "ExistingVPC",
+        "ParameterValue": "true"
+    },
+    {
+        "ParameterKey": "ExistingSubets",
+        "ParameterValue": "subnet-0e48767fb29d4413c,subnet-01dc831745215981a"
+    }
+]
