@@ -2,6 +2,8 @@
 
 ################################################################
 ## Do not include a VPC section it will be added by CodeBuild ##
+## Additional information can be found here                   ##
+## https://eksctl.io/usage/schema/                            ##
 ################################################################
 
 --- 
