@@ -17,16 +17,17 @@ EKS:
   # If UseExistingVPC is set to true replace the VPCParameters
   # section with an ExistingVPC section shown below.
   # ExistingVPC: 
-  #   PrivateSubnet1AZ: us-east-2a
-  #   PrivateSubnet1ID: subnet-025c3c3e2c2345054
-  #   PrivateSubnet2AZ: us-east-2b
-  #   PrivateSubnet2ID: subnet-0a25d5a1139d6686b
-  #   REGION: us-east-2
-  #   VPCID: vpc-0ece9d89de5bb7af
+  #   PrivateSubnet1AZ: <Availability Zone>
+  #   PrivateSubnet1ID: <Subnet ID>
+  #   PrivateSubnet2AZ: <Availability Zone>
+  #   PrivateSubnet2ID: <Subnet ID>
+  #   REGION: <Region>
+  #   VPCID: <VPC ID>
   ######################################################
   UseExistingVPC: false
   VPCParameters:
-      AvailabilityZones: us-east-1a,us-east-1b
+      # Values for AvailabilityZones should be a comma seporated list e.g. us-east-1a, us-east-1b
+      AvailabilityZones: <Availability Zone>
       NumberOfAZs: "2"
 Packages:  # Source of library leave as is unless you want to use specific versions. These will be installed in CodeBuild during the deployment.
   jq: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
