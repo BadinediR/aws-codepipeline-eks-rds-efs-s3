@@ -1,8 +1,8 @@
 # These are values used in the first stage of deployment for setting up the pipeline.
 Pipeline:
   StackName: kubeflow-pipeline # name of the CloudFormation stack created by this command.
-  BranchName: master # branch within Codecommit to deploy from. 
-  Region: us-east-1 # AWS region to deploy the stack.
+  BranchName: main # branch within Codecommit to deploy from. 
+  Region: us-east-1 # Change this to the region you would like to deploy in. 
   RepositoryName: kube-flow-on-eks # Name of the Codecommit repository in the same region to pull configurations from. This repository must contain this file. 
 EKS:
   EKSVersion: "1.15"
