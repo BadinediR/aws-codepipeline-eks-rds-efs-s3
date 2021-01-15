@@ -44,7 +44,7 @@ upgrades to be handled with a single git commit.
 1. Update `config.yaml` at root of the repo with all the params which needs to be changed.
 2. Update `eks/sample-eksctl-cluster.yaml` for cluster details.
 3. Make sure the code resides in codecommit repo in the account where you are deploying and `config.yaml` is pointing to it. 
-3. Run `./install-kubeflow.sh` deploy
+3. Run `./install-kubeflow.sh deploy`
 
 ## Folders & Files
 
