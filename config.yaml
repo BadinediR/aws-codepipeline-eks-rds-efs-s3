@@ -43,7 +43,7 @@ Packages:
   eksctl: https://github.com/weaveworks/eksctl/releases/download/0.20.0/eksctl_Linux_amd64.tar.gz
 Kubeflow:
   # kfctl config version.
-  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml 
+  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws.v1.0.2.yaml 
   # Do you want to use EFS?
   UseEFS: true  
   # Do you want to use EFS for the control plane?
