@@ -9,14 +9,14 @@ Pipeline:
   # Name of the Codecommit repository in the same region to pull configurations from. This repository must contain this file. 
   RepositoryName: kube-flow-on-eks 
 EKS:
-  EKSVersion: "1.18"
+  EKSVersion: "1.15"
   ######################################################
   # Role Which can be assumed to debug EKS cluster. 
   # This much be a role that you can assume to setup 
   # kubectl more information can be found here 
   # https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html
   ######################################################
-  DebugRoleArn: "arn:aws:iam::262898025530:instance-profile/eks-admin"
+  DebugRoleArn: "Role ARN"
   ######################################################
   # If UseExistingVPC is set to true replace the VPCParameters
   # section with an ExistingVPC section shown below.
@@ -31,7 +31,7 @@ EKS:
   UseExistingVPC: false
   VPCParameters:
       # Values for AvailabilityZones should be a comma seporated list e.g. us-east-1a, us-east-1b
-      AvailabilityZones: us-east-1a,us-east-1b
+      AvailabilityZones: "Availability Zone"
       NumberOfAZs: "2"
 # Source of library leave as is unless you want to use specific versions. These will be installed in CodeBuild during the deployment.
 Packages:  
@@ -64,7 +64,7 @@ Kubeflow:
   UseCognito: false 
 # If UseCognito is set to true this will overide the kubeflow config file if you are not using Cognito you can delete this section.
 Cognito:   
-  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws_cognito.v1.2.0.yaml
+  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws_cognito.v1.0.2.yaml
   # Certificate to use for Cognito
   certARN: "Cert-ARN" 
   cognitoAppClientId: ""
@@ -72,7 +72,7 @@ Cognito:
   cognitoUserPoolDomain: ""
 # configuration options for RDS, you can ignore this section if you are not using RDS.
 RDS: 
-  AllocatedStorageAndIops: '100GB\ 1000IOPS'
+  AllocatedStorageAndIops: '100GB 1000IOPS'
   AllowMajorVersionUpgrade: 'false'
   AutoMinorVersionUpgrade: 'true'
   BackupRetentionPeriod: '35'
