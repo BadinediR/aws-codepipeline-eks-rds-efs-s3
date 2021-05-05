@@ -12,7 +12,7 @@ kind: ClusterConfig
 metadata:
   name: sample-poc 
   region: us-east-1
-  version: 1.18
+  version: 1.15
 managedNodeGroups:
   - name: ControlPlane
     instanceType: m5.xlarge
