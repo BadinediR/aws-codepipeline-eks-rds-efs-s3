@@ -1,9 +1,13 @@
 # These are values used in the first stage of deployment for setting up the pipeline.
 Pipeline:
-  StackName: kubeflow-pipeline # name of the CloudFormation stack created by this command.
-  BranchName: main # branch within Codecommit to deploy from. 
-  Region: us-east-1 # Change this to the region you would like to deploy in. 
-  RepositoryName: kube-flow-on-eks # Name of the Codecommit repository in the same region to pull configurations from. This repository must contain this file. 
+  # name of the CloudFormation stack created by this command.
+  StackName: kubeflow-pipeline 
+  # branch within Codecommit to deploy from.
+  BranchName: main  
+  # Change this to the region you would like to deploy in.
+  Region: us-east-1  
+  # Name of the Codecommit repository in the same region to pull configurations from. This repository must contain this file. 
+  RepositoryName: kube-flow-on-eks 
 EKS:
   EKSVersion: "1.15"
   ######################################################
@@ -12,7 +16,7 @@ EKS:
   # kubectl more information can be found here 
   # https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html
   ######################################################
-  DebugRoleArn: <Role ARN>
+  DebugRoleArn: "Role ARN"
   ######################################################
   # If UseExistingVPC is set to true replace the VPCParameters
   # section with an ExistingVPC section shown below.
@@ -27,9 +31,10 @@ EKS:
   UseExistingVPC: false
   VPCParameters:
       # Values for AvailabilityZones should be a comma seporated list e.g. us-east-1a, us-east-1b
-      AvailabilityZones: <Availability Zone>
+      AvailabilityZones: "Availability Zone"
       NumberOfAZs: "2"
-Packages:  # Source of library leave as is unless you want to use specific versions. These will be installed in CodeBuild during the deployment.
+# Source of library leave as is unless you want to use specific versions. These will be installed in CodeBuild during the deployment.
+Packages:  
   jq: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
   yq: https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
   kfctl: https://github.com/kubeflow/kfctl/releases/download/v1.0.2/kfctl_v1.0.2-0-ga476281_linux.tar.gz
@@ -37,24 +42,36 @@ Packages:  # Source of library leave as is unless you want to use specific versi
   awsIamAuthenticator: https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-07-26/bin/linux/amd64/aws-iam-authenticator
   eksctl: https://github.com/weaveworks/eksctl/releases/download/0.20.0/eksctl_Linux_amd64.tar.gz
 Kubeflow:
-  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws.v1.0.2.yaml # kfctl config version.
-  UseEFS: true  # Do you want to use EFS?
-  UseEFSControlPlane: true # Do you want to use EFS for the control plane?
+  # kfctl config version.
+  configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml 
+  # Do you want to use EFS?
+  UseEFS: true  
+  # Do you want to use EFS for the control plane?
+  UseEFSControlPlane: true 
   # ExistingEFS: #Set the value of the existing id of efs to use if you want to sue an existing EFS.
   # ExistingEFSControlPlane: #Set the value of the existing id of efs to use an existing EFS.
-  UseRDS: true # Do you want to use RDS for state?
-  UseS3: false # S3 not currently available in Kubeflow
-  ALBPolicyDocument: https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/iam-policy.json # Policy for the ALB that will be created as an ingress controller.
-  HostedZoneId:  # Route53 Hosted Zone ID to use for your control panel ingress.
-  Route53DomainName: # Domain name to use for control panel.
-  UseCognito: false # Do you want to use cognito for authentication, make sure to set up Cognito first if you do?
-Cognito:   # If UseCognito is set to true this will overide the kubeflow config file if you are not using Cognito you can delete this section.
+  # Do you want to use RDS for state?
+  UseRDS: true 
+  # S3 not currently available in Kubeflow
+  UseS3: false 
+  # Policy for the ALB that will be created as an ingress controller.
+  ALBPolicyDocument: https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/iam-policy.json 
+  # Route53 Hosted Zone ID to use for your control panel ingress.
+  HostedZoneId:  
+  # Domain name to use for control panel.
+  Route53DomainName:
+  # Do you want to use cognito for authentication, make sure to set up Cognito first if you do? 
+  UseCognito: false 
+# If UseCognito is set to true this will overide the kubeflow config file if you are not using Cognito you can delete this section.
+Cognito:   
   configURL: https://raw.githubusercontent.com/kubeflow/manifests/v1.0-branch/kfdef/kfctl_aws_cognito.v1.0.2.yaml
-  certARN: "<Cert ARN>" # Certificate to use for Cognito
+  # Certificate to use for Cognito
+  certARN: "Cert-ARN" 
   cognitoAppClientId: ""
   cognitoUserPoolArn: ""
   cognitoUserPoolDomain: ""
-RDS: # configuration options for RDS, you can ignore this section if you are not using RDS.
+# configuration options for RDS, you can ignore this section if you are not using RDS.
+RDS: 
   AllocatedStorageAndIops: '100GB 1000IOPS'
   AllowMajorVersionUpgrade: 'false'
   AutoMinorVersionUpgrade: 'true'
@@ -76,7 +93,8 @@ RDS: # configuration options for RDS, you can ignore this section if you are not
   StorageEncrypted: 'false'
   StorageType: 'io1'
   # DBSnapshotIdentifier: #set the arn of an existing snapshot to restore the database from.
-EFS: # EFS configurations, you can ignore this section if you are not using EFS.
+# EFS configurations, you can ignore this section if you are not using EFS.
+EFS: 
   Owner: FirstName LastName
   Project: EFS Kubeflow
   PerformanceMode: generalPurpose
