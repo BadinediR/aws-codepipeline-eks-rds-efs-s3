@@ -10,8 +10,7 @@ connecting to an existing VPC. All of this can be configured in a central config
 root of the repository. This project allows you to
 
 use a single shell script that launches a CodePipeline using CloudFormation. The initial deployment
-only sets up the deployment pipeline. Then the individual deployment of Kubeflow is pulled from code
-commit which allows for separate versioning of individual cluster changes. This also allows for cluster
+only sets up the deployment pipeline. Then the individual deployment of Kubeflow is pulled from CodeCommit which allows for separate versioning of individual cluster changes. This also allows for cluster
 upgrades to be handled with a single git commit.
 
 <div align="center">
@@ -43,7 +42,7 @@ upgrades to be handled with a single git commit.
 
 1. Update `config.yaml` at root of the repo with all the params which needs to be changed.
 2. Update `eks/sample-eksctl-cluster.yaml` for cluster details.
-3. Make sure the code resides in codecommit repo in the account where you are deploying and `config.yaml` is pointing to it. 
+3. Make sure the code resides in CodeCommit repo in the account where you are deploying and `config.yaml` is pointing to it. 
 3. Run `./install-kubeflow.sh deploy`
 
 ## Folders & Files
